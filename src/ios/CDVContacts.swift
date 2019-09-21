@@ -11,9 +11,9 @@
  to you under the Apache License, Version 2.0 (the
  "License"); you may not use this file except in compliance
  with the License.  You may obtain a copy of the License at
- 
+
  http://www.apache.org/licenses/LICENSE-2.0
- 
+
  Unless required by applicable law or agreed to in writing,
  software distributed under the License is distributed on an
  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -39,9 +39,9 @@ class CDVNewContactsController: CNContactViewController {
 }
 
 @objc(CDVContacts) class CDVContacts: CDVPlugin, CNContactViewControllerDelegate, CNContactPickerDelegate {
-    
+
     //    var status: CNAuthorizationStatus = CNContactStore.authorizationStatus(for: .contacts)
-    
+
     static let allContactKeys: [CNKeyDescriptor] = [CNContactIdentifierKey as CNKeyDescriptor,
                                                     CNContactNicknameKey as CNKeyDescriptor,
                                                     CNContactGivenNameKey as CNKeyDescriptor,
@@ -69,12 +69,12 @@ class CDVNewContactsController: CNContactViewController {
                                                     CNInstantMessageAddressServiceKey as CNKeyDescriptor,
                                                     CNContactTypeKey as CNKeyDescriptor,
                                                     CNContactImageDataAvailableKey as CNKeyDescriptor]
-    
+
     // overridden to clean up Contact statics
     override func onAppTerminate() {
         // NSLog(@"Contacts::onAppTerminate");
     }
-    
+
     func checkContactPermission() {
         // if no permissions granted try to request them first
         let status = CNContactStore.authorizationStatus(for: .contacts)
@@ -86,24 +86,24 @@ class CDVNewContactsController: CNContactViewController {
             })
         }
     }
-    
+
     // iPhone only method to create a new contact through the GUI
     func newContact(_ command: CDVInvokedUrlCommand) {
         checkContactPermission()
         let callbackId: String = command.callbackId
         let weakSelf: CDVContacts? = self
-        
+
         if CNContactStore.authorizationStatus(for: .contacts) == .authorized {
             let npController = CDVNewContactsController()
             npController.contactStore = CNContactStore()
-            
+
             npController.delegate = self
             npController.callbackId = callbackId
             let navController = UINavigationController(rootViewController: npController as UIViewController)
             weakSelf?.viewController.present(navController, animated: true) {() -> Void in }
         }
     }
-    
+
     func existsValue(_ dict: [AnyHashable: Any], val expectedValue: String, forKey key: String) -> Bool {
         checkContactPermission()
         let val = dict[key]
@@ -113,21 +113,21 @@ class CDVNewContactsController: CNContactViewController {
         }
         return exists
     }
-    
+
     func displayContact(_ command: CDVInvokedUrlCommand) {
         checkContactPermission()
         let callbackId: String = command.callbackId
         let weakSelf: CDVContacts? = self
-        
+
         if CNContactStore.authorizationStatus(for: .contacts) == .authorized {
             let recordID = command.argument(at: 0) as? String
             var lookupError: Bool = true
-            
+
             if let id = recordID {
                 if let rec: CNContact = try? CNContactStore().unifiedContact(withIdentifier: id, keysToFetch: CDVContacts.allContactKeys) {
                     let options = command.argument(at: 1, withDefault: NSNull()) as! [AnyHashable: Any]
                     let bEdit: Bool = (options.count > 0) ? false : existsValue(options, val: "true", forKey: "allowsEditing")
-                    
+
                     lookupError = false
                     let personController = CDVDisplayContactViewController(for: rec)
                     personController.delegate = self
@@ -158,36 +158,41 @@ class CDVNewContactsController: CNContactViewController {
             return
         }
     }
-    
+
     func contactViewController(_ viewController: CNContactViewController, shouldPerformDefaultActionFor property: CNContactProperty) -> Bool {
         checkContactPermission()
         return true
     }
-    
+
     func chooseContact(_ command: CDVInvokedUrlCommand) {
         checkContactPermission()
         let callbackId: String = command.callbackId
         let commandFields = command.argument(at: 0, withDefault: [Any]()) as? [Any]
         let commandOptions = command.argument(at: 1, withDefault: [AnyHashable: Any]()) as? [AnyHashable: Any]
-        
+
         let pickerController = CDVContactsPicker()
         pickerController.delegate = self
         pickerController.callbackId = callbackId
         pickerController.pickedContactDictionary = [
             kW3ContactId : ""
         ]
-        
+
         //        pickerController.predicateForSelectionOfContact = NSPredicate(value: true)
-        
+
         if let fields = commandFields {
             pickerController.fields = fields
             for field in fields {
                 if let string = field as? String {
                     if string == "emails" {
                         pickerController.displayedPropertyKeys = [CNContactEmailAddressesKey];
-                        pickerController.predicateForEnablingContact = NSPredicate(format: "emailAddresses.@count > 0 || phoneNumbers.@count > 0")
+                        pickerController.predicateForEnablingContact = NSPredicate(format: "emailAddresses.@count > 0")
                         pickerController.predicateForSelectionOfContact = NSPredicate(format: "emailAddresses.@count == 1")
                         pickerController.predicateForSelectionOfProperty = NSPredicate(format: "key == 'emailAddresses'")
+                    } else if string == "phoneNumbers" {
+                        pickerController.displayedPropertyKeys = [CNContactPhoneNumbersKey];
+                        pickerController.predicateForEnablingContact = NSPredicate(format: "phoneNumbers.@count > 0")
+                        pickerController.predicateForSelectionOfContact = NSPredicate(format: "phoneNumbers.@count == 1")
+                        pickerController.predicateForSelectionOfProperty = NSPredicate(format: "key == 'phoneNumbers'")
                     }
                 }
             }
@@ -197,11 +202,11 @@ class CDVNewContactsController: CNContactViewController {
         } else {
             pickerController.allowsEditing = false
         }
-        
+
         UISearchBar.appearance().isHidden = true
         viewController.present(pickerController, animated: true) {() -> Void in }
     }
-    
+
     func pickContact(_ command: CDVInvokedUrlCommand) {
         checkContactPermission()
         let newCommand = CDVInvokedUrlCommand(arguments: command.arguments, callbackId: command.callbackId, className: command.className, methodName: command.methodName)
@@ -232,11 +237,11 @@ class CDVNewContactsController: CNContactViewController {
             })
         }
     }
-    
+
     func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
         // return contactId or invalid if none picked
         let ctctPicker: CDVContactsPicker = picker as! CDVContactsPicker
-        
+
         if let allowEditing = ctctPicker.allowsEditing {
             if allowEditing {
                 // get the info after possible edit
@@ -250,7 +255,7 @@ class CDVNewContactsController: CNContactViewController {
                 }
             }
         }
-        
+
         let recordId = ctctPicker.pickedContactDictionary[kW3ContactId] as? String
         picker.presentingViewController?.dismiss(animated: true, completion: {() -> Void in
             var result: CDVPluginResult? = nil
@@ -264,15 +269,15 @@ class CDVNewContactsController: CNContactViewController {
             self.commandDelegate.send(result, callbackId: ctctPicker.callbackId)
         })
     }
-    
+
     // Called after a person has been selected by the user.
     func contactPicker(_ picker: CNContactPickerViewController, didSelect contacts: [CNContact]) {
         let ctctPicker = picker as! CDVContactsPicker
-        
+
         if (ctctPicker.allowsEditing == nil || ctctPicker.allowsEditing == true) {
             let contact = contacts[0]
             let pickedId = contact.identifier
-            
+
             let personController = CNContactViewController(for: contact)
             personController.delegate = self
             personController.allowsEditing = ctctPicker.allowsEditing ?? false
@@ -285,14 +290,14 @@ class CDVNewContactsController: CNContactViewController {
             // Retrieve and return pickedContacts information
             var returnContacts = [[AnyHashable: Any]]()
             var result: [CDVContact] = [CDVContact]()
-            
-            
+
+
             for contact in contacts {
                 result.append(CDVContact(fromCNContact: contact))
             }
-            
+
             let returnFields = CDVContact.self.calcReturnFields(ctctPicker.fields)
-            
+
             if (result.count > 0) {
                 // convert to JS Contacts format and return in callback
                 // - returnFields  determines what properties to return
@@ -303,7 +308,7 @@ class CDVNewContactsController: CNContactViewController {
                     }
                 }
             }
-            
+
             ctctPicker.presentingViewController?.dismiss(animated: true, completion: {() -> Void in
                 // return found contacts (array is empty if no contacts found)
                 let result = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: returnContacts)
@@ -311,7 +316,7 @@ class CDVNewContactsController: CNContactViewController {
             })
         }
     }
-    
+
     // Called after a property has been selected by the user.
     func contactPicker(_ picker: CNContactPickerViewController, didSelect contactProperty: CNContactProperty) {
         let ctctPicker = picker as! CDVContactsPicker
@@ -338,7 +343,7 @@ class CDVNewContactsController: CNContactViewController {
             self.commandDelegate.send(result, callbackId: ctctPicker.callbackId)
         })
     }
-    
+
     func search(_ command: CDVInvokedUrlCommand) {
         checkContactPermission()
         let callbackId: String = command.callbackId
@@ -372,7 +377,7 @@ class CDVNewContactsController: CNContactViewController {
                                     desiredFields = dFields
                                 }
                             }
-                            
+
                         }
                     }
                     let searchFields = CDVContact.self.calcReturnFields(fields)
@@ -431,17 +436,17 @@ class CDVNewContactsController: CNContactViewController {
         }
         return
     }
-    
+
     func save(_ command: CDVInvokedUrlCommand) {
         checkContactPermission()
         let callbackId: String = command.callbackId
         let commandContactDict = command.argument(at: 0) as? [AnyHashable: Any]
-        
+
         if let contactDict = commandContactDict {
             commandDelegate.run(inBackground: {() -> Void in
                 let weakSelf: CDVContacts? = self
                 var result: CDVPluginResult? = nil
-                
+
                 if CNContactStore.authorizationStatus(for: .contacts) == .authorized {
                     var bIsError = false
                     var bSuccess = false
@@ -519,14 +524,14 @@ class CDVNewContactsController: CNContactViewController {
             }) // end of  queue
         }
     }
-    
+
     func remove(_ command: CDVInvokedUrlCommand) {
         checkContactPermission()
         let callbackId: String = command.callbackId
         let commandcId = command.argument(at: 0) as? String
         let weakSelf: CDVContacts? = self
         var result: CDVPluginResult? = nil
-        
+
         if CNContactStore.authorizationStatus(for: .contacts) == .authorized {
             var bIsError = false
             var errCode: CDVContactError = CDVContactError.UNKNOWN_ERROR
@@ -569,7 +574,7 @@ class CDVNewContactsController: CNContactViewController {
         }
         return
     }
-    
+
 }
 
 /* ABPersonViewController does not have any UI to dismiss.  Adding navigationItems to it does not work properly
